@@ -18,7 +18,7 @@ import { NavUser } from "./navuser"
 
 export function AppSidebar() {
     return (
-        <Sidebar collapsible="icon">
+        <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
                 <SidebarMenuItem>
                     <SidebarMenuButton
@@ -75,12 +75,12 @@ export function AppSidebar() {
             </SidebarContent>
             <SidebarFooter>
                 <NavUser user={{
-                    name: "shadcn",
-                    email: "m@example.com",
+                    name: "Gabriel",
+                    email: "gabriel@gmail.com",
                     avatar: "/avatars/shadcn.jpg",
                 }} />
             </SidebarFooter>
             <SidebarRail />
-        </Sidebar>
+        </Sidebar >
     )
 }

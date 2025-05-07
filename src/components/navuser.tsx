@@ -1,14 +1,8 @@
 "use client"
 
 import {
-    BadgeCheck,
-    Bell,
     ChevronsUpDown,
-    CreditCard,
     LogOut,
-    Moon,
-    Sparkles,
-    Sun,
 } from "lucide-react"
 
 import {
@@ -31,7 +25,6 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
-import { useTheme } from "next-themes"
 import ThemeButton from "./theme-button"
 
 export function NavUser({
