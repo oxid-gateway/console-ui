@@ -18,6 +18,10 @@ import {
   X,
   Trash2,
   Loader2,
+  Bug,
+  Play,
+  SkipForward,
+  StopCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -36,6 +40,26 @@ export default function RouteDetails(props: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Debugger state
+  const [isDebuggerAttached, setIsDebuggerAttached] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
+
+  // Mock message body - replace with actual data
+  const [currentMessage, setCurrentMessage] = useState({
+    method: "POST",
+    path: "/api/v1/users",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    },
+    body: {
+      name: "John Doe",
+      email: "john.doe@example.com",
+      role: "admin",
+    },
+    timestamp: "2025-11-19T14:32:15.234Z",
+  });
 
   const [originalData] = useState(props.details);
 
@@ -120,8 +144,65 @@ export default function RouteDetails(props: any) {
     }
   };
 
+  // Debugger functions
+  const handleAttachDebugger = async () => {
+    setIsAttaching(true);
+    try {
+      // TODO: Replace with actual API endpoint
+      // await axios.post(`http://localhost:9999/routes/${props.details.id}/debug/attach`, {
+      //   headers: {
+      //     Authorization: `Bearer ${"123"}`,
+      //   },
+      // });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setIsDebuggerAttached(true);
+      toast.success("Debugger attached successfully");
+    } catch (err: any) {
+      console.log(err);
+      toast.error("Failed to attach debugger");
+    } finally {
+      setIsAttaching(false);
+    }
+  };
+
+  const handleNextBreakpoint = async () => {
+    try {
+      // TODO: Replace with actual API endpoint
+      // await axios.post(`http://localhost:9999/routes/${props.details.id}/debug/next`, {
+      //   headers: {
+      //     Authorization: `Bearer ${"123"}`,
+      //   },
+      // });
+      
+      toast.info("Moving to next breakpoint...");
+    } catch (err: any) {
+      console.log(err);
+      toast.error("Failed to move to next breakpoint");
+    }
+  };
+
+  const handleReleaseDebugger = async () => {
+    try {
+      // TODO: Replace with actual API endpoint
+      // await axios.post(`http://localhost:9999/routes/${props.details.id}/debug/release`, {
+      //   headers: {
+      //     Authorization: `Bearer ${"123"}`,
+      //   },
+      // });
+      
+      setIsDebuggerAttached(false);
+      toast.success("Debugger released");
+    } catch (err: any) {
+      console.log(err);
+      toast.error("Failed to release debugger");
+    }
+  };
+
   return (
-    <div className="w-full mx-auto">
+    <div className="w-full mx-auto space-y-6">
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
@@ -261,6 +342,126 @@ export default function RouteDetails(props: any) {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Debugger Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Bug className="h-6 w-6" />
+                Route Debugger
+              </CardTitle>
+              <CardDescription>
+                {isDebuggerAttached
+                  ? "Debugger is attached and monitoring requests"
+                  : "Attach debugger to intercept and inspect requests"}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              {!isDebuggerAttached ? (
+                <Button
+                  onClick={handleAttachDebugger}
+                  disabled={isAttaching}
+                  size="sm"
+                >
+                  {isAttaching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Attaching...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Attach
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={handleNextBreakpoint}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <SkipForward className="h-4 w-4 mr-2" />
+                    Next
+                  </Button>
+                  <Button
+                    onClick={handleReleaseDebugger}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    <StopCircle className="h-4 w-4 mr-2" />
+                    Release
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        {isDebuggerAttached && (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Current Message</Label>
+              <div className="border rounded-md p-4 bg-slate-50 font-mono text-sm space-y-3">
+                <div>
+                  <span className="font-semibold text-blue-600">
+                    {currentMessage.method}
+                  </span>{" "}
+                  <span className="text-green-600">{currentMessage.path}</span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500 font-semibold">
+                    HEADERS:
+                  </div>
+                  <div className="pl-2 text-xs">
+                    {Object.entries(currentMessage.headers).map(
+                      ([key, value]) => (
+                        <div key={key}>
+                          <span className="text-purple-600">{key}:</span>{" "}
+                          <span className="text-gray-700">{value}</span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500 font-semibold">
+                    BODY:
+                  </div>
+                  <pre className="pl-2 text-xs text-gray-700 overflow-auto">
+                    {JSON.stringify(currentMessage.body, null, 2)}
+                  </pre>
+                </div>
+
+                <div className="text-xs text-gray-400 pt-2 border-t">
+                  Timestamp: {currentMessage.timestamp}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
+              <span className="text-sm text-blue-700">
+                Waiting at breakpoint...
+              </span>
+            </div>
+          </CardContent>
+        )}
+
+        {!isDebuggerAttached && (
+          <CardContent>
+            <div className="text-center py-8 text-gray-500">
+              <Bug className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>Attach the debugger to start intercepting requests</p>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       {/* Delete confirmation dialog */}
