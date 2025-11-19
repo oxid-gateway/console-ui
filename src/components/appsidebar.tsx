@@ -15,8 +15,11 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { NavUser } from "./navuser"
+import { useRouter } from "next/navigation"
 
 export function AppSidebar() {
+    const router = useRouter()
+
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
@@ -24,6 +27,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                         size="lg"
                         className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                        onClick={() => router.push("/")}
                     >
                         <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                             <Settings className="size-4" />
@@ -42,19 +46,13 @@ export function AppSidebar() {
                     <SidebarGroupLabel>Resources</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenuItem>
-                            <SidebarMenuButton>
+                            <SidebarMenuButton onClick={() => router.push("/upstreams")}>
                                 <Network />
                                 Upstreams
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton>
-                                <FileText />
-                                Services
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton>
+                            <SidebarMenuButton onClick={() => router.push("/routes")}>
                                 <Split />
                                 Routes
                             </SidebarMenuButton>
@@ -65,7 +63,7 @@ export function AppSidebar() {
                     <SidebarGroupLabel>Access Control</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenuItem>
-                            <SidebarMenuButton>
+                            <SidebarMenuButton onClick={() => router.push("/consumers")}>
                                 <User />
                                 Consumers
                             </SidebarMenuButton>

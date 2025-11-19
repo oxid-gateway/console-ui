@@ -10,9 +10,11 @@ export default function Layout({
         <>
             <SidebarProvider>
                 <AppSidebar />
-                <main>
+                <main className="w-full">
                     <SidebarTrigger />
-                    {children}
+                    <div className="p-6 w-full relative">
+                        {children}
+                    </div>
                 </main>
             </SidebarProvider>
         </>
