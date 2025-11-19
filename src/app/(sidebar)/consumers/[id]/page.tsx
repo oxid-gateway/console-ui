@@ -1,6 +1,6 @@
 "use server"
 
-import UpstreamDetails from "@/components/upstream-details"
+import ConsumerDetails from "@/components/consumer-details";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -9,7 +9,7 @@ export default async function Page(context: any) {
     try {
 
     const params = await context.params
-    const { data } = await axios.get(`http://localhost:9999/upstreams/${params.id}`, {
+    const { data } = await axios.get(`http://localhost:9999/consumers/${params.id}`, {
         headers: {
             Authorization: `Bearer ${"123"}`
         }
@@ -20,5 +20,5 @@ export default async function Page(context: any) {
         toast.error("Failed to get upstream")
     }
 
-    return <UpstreamDetails details={details}/>
+    return <ConsumerDetails details={details}/>
 }
