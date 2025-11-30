@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -22,6 +22,7 @@ import {
   Play,
   SkipForward,
   StopCircle,
+  RefreshCw,
 } from "lucide-react";
 import {
   Dialog,
@@ -34,6 +35,14 @@ import {
 import { toast } from "sonner";
 import axios from "axios";
 import { Switch } from "./ui/switch";
+import {
+  attachDebugger,
+  sendNextBreakpoint,
+  releaseDebugger,
+  getDebugMessages,
+  getSessionStatus,
+  type DebugMessage,
+} from "@/app/actions/debug-actions";
 
 export default function RouteDetails(props: any) {
   const router = useRouter();
@@ -44,35 +53,63 @@ export default function RouteDetails(props: any) {
   // Debugger state
   const [isDebuggerAttached, setIsDebuggerAttached] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
-
-  // Mock message body - replace with actual data
-  const [currentMessage, setCurrentMessage] = useState({
-    method: "POST",
-    path: "/api/v1/users",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    },
-    body: {
-      name: "John Doe",
-      email: "john.doe@example.com",
-      role: "admin",
-    },
-    timestamp: "2025-11-19T14:32:15.234Z",
-  });
+  const [debugMessages, setDebugMessages] = useState<DebugMessage[]>([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [isWaitingForRequest, setIsWaitingForRequest] = useState(true);
+  const [debugSessionEnded, setDebugSessionEnded] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
 
   const [originalData] = useState(props.details);
-
   const [formData, setFormData] = useState({ ...originalData });
   const [errors, setErrors] = useState({});
 
+  // Polling for new messages
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    const pollMessages = async () => {
+      if (!isDebuggerAttached || debugSessionEnded) return;
+
+      try {
+        const response = await getDebugMessages(props.details.id);
+        
+        // Update messages if we received new ones
+        if (response.messages.length > debugMessages.length) {
+          setDebugMessages(response.messages);
+          setIsWaitingForRequest(false);
+          toast.info("Request intercepted at breakpoint");
+        }
+
+        // Check if session is still active
+        if (!response.isActive && response.messages.length > 0) {
+          setDebugSessionEnded(true);
+          setIsPolling(false);
+          toast.info("Debug session ended - request completed");
+        }
+      } catch (error) {
+        console.error("Failed to poll messages:", error);
+      }
+    };
+
+    if (isDebuggerAttached && !debugSessionEnded) {
+      setIsPolling(true);
+      // Poll every 500ms
+      intervalId = setInterval(pollMessages, 500);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        setIsPolling(false);
+      }
+    };
+  }, [isDebuggerAttached, debugSessionEnded, debugMessages.length, props.details.id]);
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.path.trim()) {
       newErrors.path = "Path is required";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -89,7 +126,6 @@ export default function RouteDetails(props: any) {
 
   const handleSave = async () => {
     if (validate()) {
-      console.log("Saving:", formData);
       try {
         await axios.put(
           `http://localhost:9999/routes/${props.details.id}`,
@@ -103,7 +139,6 @@ export default function RouteDetails(props: any) {
             },
           }
         );
-
         setIsEditing(false);
         toast.success("Route edited");
       } catch (err: any) {
@@ -118,7 +153,6 @@ export default function RouteDetails(props: any) {
       ...prev,
       [field]: value,
     }));
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
     }
@@ -132,7 +166,6 @@ export default function RouteDetails(props: any) {
           Authorization: `Bearer ${"123"}`,
         },
       });
-
       setIsDeleting(false);
       setShowDeleteConfirm(false);
       toast.success("Route deleted");
@@ -147,59 +180,101 @@ export default function RouteDetails(props: any) {
   // Debugger functions
   const handleAttachDebugger = async () => {
     setIsAttaching(true);
+    setDebugMessages([]);
+    setCurrentMessageIndex(0);
+    setIsWaitingForRequest(true);
+    setDebugSessionEnded(false);
+
     try {
-      // TODO: Replace with actual API endpoint
-      // await axios.post(`http://localhost:9999/routes/${props.details.id}/debug/attach`, {
-      //   headers: {
-      //     Authorization: `Bearer ${"123"}`,
-      //   },
-      // });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const result = await attachDebugger(props.details.id);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to attach debugger");
+      }
+
       setIsDebuggerAttached(true);
       toast.success("Debugger attached successfully");
     } catch (err: any) {
-      console.log(err);
-      toast.error("Failed to attach debugger");
+      console.error("Failed to attach debugger:", err);
+      toast.error(err.message || "Failed to attach debugger");
+      setIsDebuggerAttached(false);
     } finally {
       setIsAttaching(false);
     }
   };
 
   const handleNextBreakpoint = async () => {
+    if (debugSessionEnded) {
+      toast.warning("Debug session has ended");
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API endpoint
-      // await axios.post(`http://localhost:9999/routes/${props.details.id}/debug/next`, {
-      //   headers: {
-      //     Authorization: `Bearer ${"123"}`,
-      //   },
-      // });
-      
-      toast.info("Moving to next breakpoint...");
+      const result = await sendNextBreakpoint(props.details.id);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to move to next breakpoint");
+      }
+
+      // Move to next message if available
+      if (currentMessageIndex < debugMessages.length - 1) {
+        setCurrentMessageIndex((prev) => prev + 1);
+        toast.info("Moved to next breakpoint");
+      } else {
+        setIsWaitingForRequest(true);
+        toast.info("Waiting for next request...");
+      }
     } catch (err: any) {
-      console.log(err);
-      toast.error("Failed to move to next breakpoint");
+      console.error("Failed to move to next breakpoint:", err);
+      
+      // Check if session has ended
+      const status = await getSessionStatus(props.details.id);
+      if (!status.isActive && status.messageCount > 0) {
+        setDebugSessionEnded(true);
+        toast.info("Debug session ended - request completed");
+      } else {
+        toast.error(err.message || "Failed to move to next breakpoint");
+      }
     }
   };
 
   const handleReleaseDebugger = async () => {
     try {
-      // TODO: Replace with actual API endpoint
-      // await axios.post(`http://localhost:9999/routes/${props.details.id}/debug/release`, {
-      //   headers: {
-      //     Authorization: `Bearer ${"123"}`,
-      //   },
-      // });
-      
+      const result = await releaseDebugger(props.details.id);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to release debugger");
+      }
+
       setIsDebuggerAttached(false);
+      setDebugMessages([]);
+      setCurrentMessageIndex(0);
+      setIsWaitingForRequest(true);
+      setDebugSessionEnded(false);
       toast.success("Debugger released");
     } catch (err: any) {
-      console.log(err);
-      toast.error("Failed to release debugger");
+      console.error("Failed to release debugger:", err);
+      toast.error(err.message || "Failed to release debugger");
     }
   };
+
+  const handleRefreshMessages = async () => {
+    try {
+      const response = await getDebugMessages(props.details.id);
+      setDebugMessages(response.messages);
+      
+      if (!response.isActive && response.messages.length > 0) {
+        setDebugSessionEnded(true);
+      }
+      
+      toast.success("Messages refreshed");
+    } catch (err: any) {
+      console.error("Failed to refresh messages:", err);
+      toast.error("Failed to refresh messages");
+    }
+  };
+
+  const currentMessage = debugMessages[currentMessageIndex];
 
   return (
     <div className="w-full mx-auto space-y-6">
@@ -352,10 +427,16 @@ export default function RouteDetails(props: any) {
               <CardTitle className="text-2xl flex items-center gap-2">
                 <Bug className="h-6 w-6" />
                 Route Debugger
+                {isPolling && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Polling
+                  </span>
+                )}
               </CardTitle>
               <CardDescription>
                 {isDebuggerAttached
-                  ? "Debugger is attached and monitoring requests"
+                  ? `Debugger attached - ${debugMessages.length} message${debugMessages.length !== 1 ? 's' : ''} captured`
                   : "Attach debugger to intercept and inspect requests"}
               </CardDescription>
             </div>
@@ -381,9 +462,18 @@ export default function RouteDetails(props: any) {
               ) : (
                 <>
                   <Button
+                    onClick={handleRefreshMessages}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button
                     onClick={handleNextBreakpoint}
                     variant="outline"
                     size="sm"
+                    disabled={debugSessionEnded}
                   >
                     <SkipForward className="h-4 w-4 mr-2" />
                     Next
@@ -404,53 +494,87 @@ export default function RouteDetails(props: any) {
 
         {isDebuggerAttached && (
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Current Message</Label>
-              <div className="border rounded-md p-4 bg-slate-50 font-mono text-sm space-y-3">
-                <div>
-                  <span className="font-semibold text-blue-600">
-                    {currentMessage.method}
-                  </span>{" "}
-                  <span className="text-green-600">{currentMessage.path}</span>
+            {debugMessages.length > 0 && currentMessage && (
+              <>
+                <div className="flex items-center justify-between">
+                  <Label>Current Message ({currentMessageIndex + 1} of {debugMessages.length})</Label>
+                  {debugMessages.length > 1 && (
+                    <div className="text-xs text-gray-500">
+                      Use "Next" to step through breakpoints
+                    </div>
+                  )}
                 </div>
-
-                <div className="space-y-1">
-                  <div className="text-xs text-gray-500 font-semibold">
-                    HEADERS:
+                <div className="border rounded-md p-4 bg-slate-50 font-mono text-sm space-y-3">
+                  <div>
+                    <span className="font-semibold text-blue-600">
+                      {currentMessage.method}
+                    </span>{" "}
+                    <span className="text-green-600">{currentMessage.path}</span>
                   </div>
-                  <div className="pl-2 text-xs">
-                    {Object.entries(currentMessage.headers).map(
-                      ([key, value]) => (
-                        <div key={key}>
-                          <span className="text-purple-600">{key}:</span>{" "}
-                          <span className="text-gray-700">{value}</span>
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
 
-                <div className="space-y-1">
-                  <div className="text-xs text-gray-500 font-semibold">
-                    BODY:
+                  <div className="space-y-1">
+                    <div className="text-xs text-gray-500 font-semibold">
+                      HEADERS:
+                    </div>
+                    <div className="pl-2 text-xs max-h-40 overflow-auto">
+                      {Object.entries(currentMessage.headers).map(
+                        ([key, value]) => (
+                          <div key={key}>
+                            <span className="text-purple-600">{key}:</span>{" "}
+                            <span className="text-gray-700">{value}</span>
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
-                  <pre className="pl-2 text-xs text-gray-700 overflow-auto">
-                    {JSON.stringify(currentMessage.body, null, 2)}
-                  </pre>
-                </div>
 
-                <div className="text-xs text-gray-400 pt-2 border-t">
-                  Timestamp: {currentMessage.timestamp}
+                  {currentMessage.body && (
+                    <div className="space-y-1">
+                      <div className="text-xs text-gray-500 font-semibold">
+                        BODY:
+                      </div>
+                      <pre className="pl-2 text-xs text-gray-700 overflow-auto max-h-40">
+                        {currentMessage.body}
+                      </pre>
+                    </div>
+                  )}
+
+                  {currentMessage.notes && (
+                    <div className="space-y-1">
+                      <div className="text-xs text-gray-500 font-semibold">
+                        NOTES:
+                      </div>
+                      <div className="pl-2 text-xs text-gray-700">
+                        {currentMessage.notes}
+                      </div>
+                    </div>
+                  )}
                 </div>
+              </>
+            )}
+
+            {isWaitingForRequest && !debugSessionEnded ? (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
+                <span className="text-sm text-blue-700">
+                  {debugMessages.length === 0 
+                    ? "Waiting for first request..." 
+                    : "Waiting for next request..."}
+                </span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
-              <span className="text-sm text-blue-700">
-                Waiting at breakpoint...
-              </span>
-            </div>
+            ) : debugSessionEnded ? (
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                <span className="text-sm text-green-700">
+                  Debug session completed - request finished processing
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <span className="text-sm text-yellow-700">
+                  Paused at breakpoint - click "Next" to continue
+                </span>
+              </div>
+            )}
           </CardContent>
         )}
 
@@ -459,6 +583,9 @@ export default function RouteDetails(props: any) {
             <div className="text-center py-8 text-gray-500">
               <Bug className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p>Attach the debugger to start intercepting requests</p>
+              <p className="text-sm mt-2">
+                The debugger will pause at each step of the request processing
+              </p>
             </div>
           </CardContent>
         )}

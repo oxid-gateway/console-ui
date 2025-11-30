@@ -92,7 +92,7 @@ export default function ConsumerDetails(props: any) {
   };
 
   const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({
+    setFormData((prev: any) => ({
       ...prev,
       [field]: value,
     }));
