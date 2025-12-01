@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./global.css"
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
     title: "Oxid Gateway Console",
@@ -22,6 +23,7 @@ export default function RootLayout({
                     disableTransitionOnChange
                 >
                     {children}
+                    <Toaster/>
                 </ThemeProvider>
             </body>
         </html>

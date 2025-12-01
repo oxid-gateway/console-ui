@@ -1,4 +1,3 @@
-import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUpIcon } from "lucide-react";
@@ -6,7 +5,6 @@ import { TrendingUpIcon } from "lucide-react";
 export default function Home() {
     return (
         <>
-            <SiteHeader title="Home" />
             <div className="flex flex-1 flex-col">
                 <div className="@container/main flex flex-1 flex-col gap-2">
                     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -35,7 +33,7 @@ export default function Home() {
                             </Card>
                             <Card className="@container/card">
                                 <CardHeader className="relative">
-                                    <CardDescription>Console UI</CardDescription>
+                                    <CardDescription>Admin API</CardDescription>
                                     <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
                                         1.0.0
                                     </CardTitle>
@@ -57,7 +55,7 @@ export default function Home() {
                             </Card>
                             <Card className="@container/card">
                                 <CardHeader className="relative">
-                                    <CardDescription>Console UI</CardDescription>
+                                    <CardDescription>Reverse Proxy</CardDescription>
                                     <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
                                         1.0.0
                                     </CardTitle>
