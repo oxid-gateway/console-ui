@@ -73,18 +73,22 @@ export default function RouteDetails(props: any) {
       try {
         const response = await getDebugMessages(props.details.id);
         
-        // Update messages if we received new ones
-        if (response.messages.length > debugMessages.length) {
+        // Only update if we have new messages
+        const hasNewMessages = response.messages.length > debugMessages.length;
+        
+        if (hasNewMessages) {
           setDebugMessages(response.messages);
           setIsWaitingForRequest(false);
           toast.info("Request intercepted at breakpoint");
         }
 
-        // Check if session is still active
-        if (!response.isActive && response.messages.length > 0) {
-          setDebugSessionEnded(true);
-          setIsPolling(false);
-          toast.info("Debug session ended - request completed");
+        // Check if session ended - auto release
+        if (!response.isActive) {
+          if (response.messages.length === 0 || response.messages.length === debugMessages.length) {
+            // Session ended with no new messages - auto release
+            await handleReleaseDebugger();
+            toast.info("Debug session completed - debugger released");
+          }
         }
       } catch (error) {
         console.error("Failed to poll messages:", error);
@@ -210,17 +214,35 @@ export default function RouteDetails(props: any) {
     }
 
     try {
+      // First, send the "next" command to the server
       const result = await sendNextBreakpoint(props.details.id);
 
       if (!result.success) {
         throw new Error(result.error || "Failed to move to next breakpoint");
       }
 
-      // Move to next message if available
-      if (currentMessageIndex < debugMessages.length - 1) {
+      // Wait a bit for the server to process and potentially receive a new message
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Fetch the latest messages
+      const messagesResponse = await getDebugMessages(props.details.id);
+      
+      // Update messages state
+      setDebugMessages(messagesResponse.messages);
+
+      // Check if we have a new message to show
+      if (messagesResponse.messages.length > currentMessageIndex + 1) {
+        // Move to the next message
         setCurrentMessageIndex((prev) => prev + 1);
+        setIsWaitingForRequest(false);
         toast.info("Moved to next breakpoint");
+      } else if (!messagesResponse.isActive) {
+        // Session ended without new messages - auto release
+        await handleReleaseDebugger();
+        toast.info("Debug session completed - debugger released");
       } else {
+        // Waiting for a new message
+        handleReleaseDebugger()
         setIsWaitingForRequest(true);
         toast.info("Waiting for next request...");
       }
@@ -230,8 +252,8 @@ export default function RouteDetails(props: any) {
       // Check if session has ended
       const status = await getSessionStatus(props.details.id);
       if (!status.isActive && status.messageCount > 0) {
-        setDebugSessionEnded(true);
-        toast.info("Debug session ended - request completed");
+        await handleReleaseDebugger();
+        toast.info("Debug session completed - debugger released");
       } else {
         toast.error(err.message || "Failed to move to next breakpoint");
       }
@@ -246,11 +268,13 @@ export default function RouteDetails(props: any) {
         throw new Error(result.error || "Failed to release debugger");
       }
 
+      // Reset all state
       setIsDebuggerAttached(false);
       setDebugMessages([]);
       setCurrentMessageIndex(0);
       setIsWaitingForRequest(true);
       setDebugSessionEnded(false);
+      setIsPolling(false);
       toast.success("Debugger released");
     } catch (err: any) {
       console.error("Failed to release debugger:", err);
@@ -494,7 +518,7 @@ export default function RouteDetails(props: any) {
 
         {isDebuggerAttached && (
           <CardContent className="space-y-4">
-            {debugMessages.length > 0 && currentMessage && (
+            {debugMessages.length > 0 && currentMessageIndex < debugMessages.length && currentMessage && (
               <>
                 <div className="flex items-center justify-between">
                   <Label>Current Message ({currentMessageIndex + 1} of {debugMessages.length})</Label>
@@ -569,11 +593,13 @@ export default function RouteDetails(props: any) {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <span className="text-sm text-yellow-700">
-                  Paused at breakpoint - click "Next" to continue
-                </span>
-              </div>
+              debugMessages.length > 0 && currentMessageIndex < debugMessages.length && (
+                <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <span className="text-sm text-yellow-700">
+                    Paused at breakpoint - click "Next" to continue
+                  </span>
+                </div>
+              )
             )}
           </CardContent>
         )}
